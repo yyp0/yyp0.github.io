@@ -78,12 +78,14 @@
         isCategory: false,
         fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
         scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
-        search: 
+        search: true
     }
 </script>
 
 
-    <script> yiliaConfig.jquery_ui = [false]; </script>
+    <script>
+        yiliaConfig.jquery_ui = [true, "//cdn.bootcss.com/jqueryui/1.10.4/jquery-ui.min.js", "//cdn.bootcss.com/jqueryui/1.10.4/css/jquery-ui.min.css"];
+    </script>
 
 
 
@@ -111,6 +113,13 @@
         
 
         
+            <form id="search-form">
+            <input type="text" id="local-search-input" name="q" placeholder="search..." class="search form-control" autocomplete="off" autocorrect="off" searchonload="" />
+            <i class="fa fa-times" onclick="resetSearch()"></i>
+            </form>
+            <div id="local-search-result"></div>
+            <p class='no-result'>No results found <i class='fa fa-spinner fa-pulse'></i></p>
+        
 
 
         
@@ -131,11 +140,6 @@
                         </div>
                         
                         
-                        <div class="icon-wrap icon-me hide" data-idx="3">
-                            <div class="user"></div>
-                            <div class="shoulder"></div>
-                        </div>
-                        
                     </div>
                     
                 </div>
@@ -147,8 +151,6 @@
                         
                         <li>Friends</li>
                         
-                        
-                        <li>About Me</li>
                         
                     </ul>
                 </div>
@@ -202,18 +204,14 @@
                     
                       <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/" target="_blank" rel="noopener">MOxFIVE</a>
                     
-                      <a class="main-nav-link switch-friends-link" href="/true">friends</a>
+                      <a class="main-nav-link switch-friends-link" href="https://hhlxf.github.io/" target="_blank" rel="noopener">lxf</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="/false">friends</a>
                     
                     </div>
                 </section>
                 
 
-                
-                
-                <section class="switch-part switch-part4">
-                
-                    <div id="js-aboutme">专注于前端</div>
-                </section>
                 
             </div>
         </div>
@@ -397,22 +395,7 @@
 <script>
     // Open in New Window
     
-        var oOpenInNew = {
-            
-            
-            
-            
-            
-            
-             archives: ".archive-article-title", 
-             miniArchives: "a.post-list-link", 
-            
-             friends: "#js-friends a", 
-             socail: ".social a" 
-        }
-        for (var x in oOpenInNew) {
-            $(oOpenInNew[x]).attr("target", "_blank");
-        }
+        $("a[target=_blank]").removeAttr("target");
     
 </script>
 
