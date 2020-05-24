@@ -291,8 +291,45 @@
     <div class="article-entry" itemprop="articleBody">
       
           
-              <p>Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 <strong>Java 类加载机制</strong>。</p>
-          
+        <p>Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 <strong>Java 类的加载</strong>。</p>
+<h2 id="类加载机制"><a href="#类加载机制" class="headerlink" title="类加载机制"></a>类加载机制</h2><h3 id="什么是类加载机制"><a href="#什么是类加载机制" class="headerlink" title="什么是类加载机制"></a>什么是类加载机制</h3><p>在编译阶段 .java 文件被编译成了 .class 文件，.class 文件中主要是描述类的数据。类的加载就是 Java 虚拟机把描述类的数据从 .class 文件加载到内存，并且队数据进行校验、转换解析和初始化，最终形成可以被虚拟机直接使用的 Java 类型。</p>
+<h3 id="Java-类加载机制的过程"><a href="#Java-类加载机制的过程" class="headerlink" title="Java 类加载机制的过程"></a>Java 类加载机制的过程</h3><p>Java 类加载机制主要分为类的加载、类的连接（验证、准备、解析）、类的初始化三大过程。</p>
+<ol>
+<li><p><strong>类的加载</strong></p>
+<p>类的加载主要有三大阶段：<strong>定位 .class 文件</strong>，<strong>转换数据存储结构</strong>，<strong>生成 java.lang.Class 对象</strong></p>
+<p>a. 定位 .class 文件</p>
+<p>通过类的全限定名（包名与类名）来获取相应的 .class 文件，可获取 .class 文件的方式有：本地加载、通过网络下载 .class 文件，从 jar 包或者 war包获取、JSP 文件生成等方式</p>
+<p>b. 转换数据存储结构</p>
+<p>这一步完成的是将 .class 文件中的类的<strong>静态存储结构</strong>转换成<strong>运行时在内存中方法区的数据结构</strong></p>
+<p>c. 生成 java.lang.Class对象</p>
+<p>在内存中生成一个 java.lang.Class 对象，这个对象作为方法区中这个类的数据的入口。</p>
+</li>
+<li><p><strong>类的初始化</strong></p>
+<p>在类的连接的准备过程中，（仅仅）类的静态常量被初始化赋值（非默认值），在类的初始化阶段，类的静态变量会被初始化赋值（非默认值，在类的连接过程中，静态变量被赋值为默认值）</p>
+<p>以下几种情况需要对类进行初始化：</p>
+<p>​    a. 使用 new 创建对象    </p>
+<p>​    b. 通过反射调用类的方法和对象时，如果类没有被初始化过的话，就必须对类进行初始化</p>
+<p>​    c. 初始化子类时，如果这个类的父类没有被初始化的话那么需要先初始化父类</p>
+<p>​    d. 虚拟机启动时，定义了 main() 方法的类先被初始化</p>
+<p>​    e. 访问类的静态方法和静态变量（非静态常量）</p>
+<p>常见的被动引用例子：</p>
+<p>​    a. 通过子类调用父类的静态变量和方法时，只会对父类进行初始化，子类不会被初始化</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; father.java</span><br><span class="line">public class father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is father!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Fvalue &#x3D; 1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; son.java</span><br><span class="line">public class son extends father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is son&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Svalue &#x3D; 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; test.java</span><br><span class="line">public class test &#123;</span><br><span class="line">	public static void main(String[] args) &#123;</span><br><span class="line">		System.out.println(son.Fvalue);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; result:</span><br><span class="line">This is father!</span><br><span class="line">1</span><br></pre></td></tr></table></figure>
+
+<p>​    可以看到通过子类访问父类的静态变量时，父类被初始化了，但是子类没有被初始化</p>
+<p>​    b. 使用 new 创建类数组</p>
+<p>​        稍微修改以上代码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; test.java</span><br><span class="line">public class test &#123;</span><br><span class="line">	public static void main(string[] args) &#123;</span><br><span class="line">		father[] farr &#x3D; new father[5];</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>​        从运行的结果可以看出来此时没有进行类的初始化</p>
+<p>​    c. 访问类的常量时，不会初始化类（常量在类的连接的准备过程中就被初始化了）</p>
+<p>​        给 father 类添加一个静态常量：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; father.java</span><br><span class="line">public class father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is father!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Fvalue &#x3D; 1;</span><br><span class="line">	public static final int FSvalue &#x3D; 11;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>​    得到的结果直接输出了 11，可以看到静态常量在类初始化之前就已经被赋值了</p>
+</li>
+</ol>
+
       
     </div>
     
@@ -305,10 +342,6 @@
         <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java%E5%9F%BA%E7%A1%80/" rel="tag">Java基础</a></li></ul>
     </div>
 
-      
-        <p class="article-more-link">
-          <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/#more">more >></a>
-        </p>
       
       <div class="clearfix"></div>
     </div>
