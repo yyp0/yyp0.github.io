@@ -15,18 +15,20 @@
 
 
 
-<meta name="description" content="Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 Java 类的加载。">
+<meta name="description" content="ClassLoader什么是类加载器类加载器完成的是类加载机制中的类的加载的部分，完成从静态的 .class 文件生成 java.lang.class 对象（可以参照上一篇对 Java 类加载机制的学习 类加载器的种类在 Java 中内置的 ClassLoader 有三种：Bootstrap ClassLoader, Extension ClassLoader, Application Class">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Java类加载机制">
-<meta property="og:url" content="http://yoursite.com/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/index.html">
+<meta property="og:title" content="ClassLoader与反射">
+<meta property="og:url" content="http://yoursite.com/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/index.html">
 <meta property="og:site_name" content="yyp0&#39;s blog">
-<meta property="og:description" content="Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 Java 类的加载。">
+<meta property="og:description" content="ClassLoader什么是类加载器类加载器完成的是类加载机制中的类的加载的部分，完成从静态的 .class 文件生成 java.lang.class 对象（可以参照上一篇对 Java 类加载机制的学习 类加载器的种类在 Java 中内置的 ClassLoader 有三种：Bootstrap ClassLoader, Extension ClassLoader, Application Class">
 <meta property="og:locale" content="en_US">
-<meta property="article:published_time" content="2020-05-23T14:40:23.000Z">
-<meta property="article:modified_time" content="2020-05-24T08:00:27.359Z">
+<meta property="og:image" content="c:%5Cblog%5Cpublic%5Cimg%5Cp1.png">
+<meta property="article:published_time" content="2020-05-24T08:06:03.000Z">
+<meta property="article:modified_time" content="2020-05-24T15:33:24.568Z">
 <meta property="article:author" content="yyp0">
 <meta property="article:tag" content="Java基础">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="c:%5Cblog%5Cpublic%5Cimg%5Cp1.png">
 
 <link rel="apple-touch-icon" href= "/apple-touch-icon.png">
 
@@ -60,7 +62,7 @@
 <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
 
 
-<title>Java类加载机制 | yyp0&#39;s blog</title>
+<title>ClassLoader与反射 | yyp0&#39;s blog</title>
 
 <script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
 <script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
@@ -258,11 +260,11 @@
     </div>
     <link class="menu-list" tags="Tags" friends="Friends" about="About Me"/>
 </nav>
-      <div class="body-wrap"><article id="post-Java类加载机制" class="article article-type-post" itemscope itemprop="blogPost">
+      <div class="body-wrap"><article id="post-ClassLoader与反射" class="article article-type-post" itemscope itemprop="blogPost">
   
     <div class="article-meta">
-      <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/" class="article-date">
-      <time datetime="2020-05-23T14:40:23.000Z" itemprop="datePublished">2020-05-23</time>
+      <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" class="article-date">
+      <time datetime="2020-05-24T08:06:03.000Z" itemprop="datePublished">2020-05-24</time>
 </a>
 
 
@@ -277,7 +279,7 @@
         
   
     <h1 class="article-title" itemprop="name">
-      Java类加载机制
+      ClassLoader与反射
     </h1>
   
 
@@ -298,46 +300,60 @@
     <div class="article-entry" itemprop="articleBody">
       
           
-        <p>Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 <strong>Java 类的加载</strong>。</p>
-<a id="more"></a>
-
-<h2 id="类加载机制"><a href="#类加载机制" class="headerlink" title="类加载机制"></a>类加载机制</h2><h3 id="什么是类加载机制"><a href="#什么是类加载机制" class="headerlink" title="什么是类加载机制"></a>什么是类加载机制</h3><p>在编译阶段 .java 文件被编译成了 .class 文件，.class 文件中主要是描述类的数据。类的加载就是 Java 虚拟机把描述类的数据从 .class 文件加载到内存，并且队数据进行校验、转换解析和初始化，最终形成可以被虚拟机直接使用的 Java 类型。</p>
-<h3 id="Java-类加载机制的过程"><a href="#Java-类加载机制的过程" class="headerlink" title="Java 类加载机制的过程"></a>Java 类加载机制的过程</h3><p>Java 类加载机制主要分为类的加载、类的连接（验证、准备、解析）、类的初始化三大过程。</p>
+        <h2 id="ClassLoader"><a href="#ClassLoader" class="headerlink" title="ClassLoader"></a>ClassLoader</h2><h3 id="什么是类加载器"><a href="#什么是类加载器" class="headerlink" title="什么是类加载器"></a>什么是类加载器</h3><p>类加载器完成的是类加载机制中的类的加载的部分，完成从静态的 .class 文件生成 java.lang.class 对象（可以参照上一篇对 Java 类加载机制的学习</p>
+<h3 id="类加载器的种类"><a href="#类加载器的种类" class="headerlink" title="类加载器的种类"></a>类加载器的种类</h3><p>在 Java 中内置的 ClassLoader 有三种：Bootstrap ClassLoader, Extension ClassLoader, Application ClassLoader，另外还可以通过自定义 ClassLoader 来决定类的加载方式</p>
 <ol>
-<li><p><strong>类的加载</strong></p>
-<p>类的加载主要有三大阶段：<strong>定位 .class 文件</strong>，<strong>转换数据存储结构</strong>，<strong>生成 java.lang.Class 对象</strong></p>
-<p>a. 定位 .class 文件</p>
-<p>通过类的全限定名（包名与类名）来获取相应的 .class 文件，可获取 .class 文件的方式有：本地加载、通过网络下载 .class 文件，从 jar 包或者 war包获取、JSP 文件生成等方式</p>
-<p>b. 转换数据存储结构</p>
-<p>这一步完成的是将 .class 文件中的类的<strong>静态存储结构</strong>转换成<strong>运行时在内存中方法区的数据结构</strong></p>
-<p>c. 生成 java.lang.Class对象</p>
-<p>在内存中生成一个 java.lang.Class 对象，这个对象作为方法区中这个类的数据的入口。</p>
+<li><p>Bootstrap ClassLoader</p>
+<p>这是 Java 最基础的类加载器，负责加载 JVM 核心类，通常是我们常常看到的 java. 开头的内置库。这些类通常位于 $JAVA_HOME/lib/rt.jar 中， Bootstrap ClassLoader 为根加载器</p>
 </li>
-<li><p><strong>类的初始化</strong></p>
-<p>在类的连接的准备过程中，（仅仅）类的静态常量被初始化赋值（非默认值），在类的初始化阶段，类的静态变量会被初始化赋值（非默认值，在类的连接过程中，静态变量被赋值为默认值）</p>
-<p>以下几种情况需要对类进行初始化：</p>
-<p>​    a. 使用 new 创建对象    </p>
-<p>​    b. 通过反射调用类的方法和对象时，如果类没有被初始化过的话，就必须对类进行初始化</p>
-<p>​    c. 初始化子类时，如果这个类的父类没有被初始化的话那么需要先初始化父类</p>
-<p>​    d. 虚拟机启动时，定义了 main() 方法的类先被初始化</p>
-<p>​    e. 访问类的静态方法和静态变量（非静态常量）</p>
-<p>常见的被动引用例子：</p>
-<p>​    a. 通过子类调用父类的静态变量和方法时，只会对父类进行初始化，子类不会被初始化</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; father.java</span><br><span class="line">public class father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is father!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Fvalue &#x3D; 1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; son.java</span><br><span class="line">public class son extends father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is son&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Svalue &#x3D; 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; test.java</span><br><span class="line">public class test &#123;</span><br><span class="line">	public static void main(String[] args) &#123;</span><br><span class="line">		System.out.println(son.Fvalue);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; result:</span><br><span class="line">This is father!</span><br><span class="line">1</span><br></pre></td></tr></table></figure>
-
-<p>​    可以看到通过子类访问父类的静态变量时，父类被初始化了，但是子类没有被初始化</p>
-<p>​    b. 使用 new 创建类数组</p>
-<p>​        稍微修改以上代码：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; test.java</span><br><span class="line">public class test &#123;</span><br><span class="line">	public static void main(string[] args) &#123;</span><br><span class="line">		father[] farr &#x3D; new father[5];</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>​        从运行的结果可以看出来此时没有进行类的初始化</p>
-<p>​    c. 访问类的常量时，不会初始化类（常量在类的连接的准备过程中就被初始化了）</p>
-<p>​        给 father 类添加一个静态常量：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; father.java</span><br><span class="line">public class father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is father!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Fvalue &#x3D; 1;</span><br><span class="line">	public static final int FSvalue &#x3D; 11;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>​    得到的结果直接输出了 11，可以看到静态常量在类初始化之前就已经被赋值了</p>
+<li><p>Extension ClassLoader</p>
+<p>Extension ClassLoader 加载的对象是 $JAVA_HOME/lib/ext/ 目录下的 jar 包中的类，加载得到的类通常是我们看到的 javax. 开头的扩展类，如 javax.swing.* 等，Extension ClassLoader 继承 Bootstrap ClassLoader，是 Bootstrap ClassLoader 的子类 </p>
+</li>
+<li><p>Application ClassLoader</p>
+<p>Application ClassLoader  是直接面向用户的加载器，Application ClassLoader 加载的对象是环境变量里面的路径的 jar 包或者路径中的 jar 包，还有我们自己编写的 java 文件以及第三方 jar 包。Application ClassLoader 继承 Extension ClassLoader，是Extension ClassLoader 的子类 。Application ClassLoader 也被成为系统加载器，可以通过 getSystemClassLoader 获取。</p>
 </li>
 </ol>
+<p>以上三个加载器都是在本地文件系统加载类，在 Java 中还有一种类加载器 Url ClassLoader，使用Url ClassLoader 可以加载网络上的 jar 包中的类。</p>
+<ol start="4">
+<li><p>自定义加载器</p>
+<p>定义一个加载器时，需要注意定义这几个方法：loadClass, findClass, defineClass。其中 loadClass 的作用是在当前类加载器中寻找这个类看这个类是否已被加载，如果未被加载的话，就调用父加载器进行加载，如果双亲都加载不了的话，就调用 findClass 由自定义加载器自己进行加载。这里需要注意 findClass 常常由自定义类加载器的子类自己定义。如果调用了 findClass 还是加载不了这个类的话，就会抛出异常。defineClass 的作用就是当类加载器完成 loadClass 和 findClass 的步骤时，将字节码对象转换成 class 对象，完成类的加载过程。 </p>
+</li>
+</ol>
+<h3 id="类加载器的运作"><a href="#类加载器的运作" class="headerlink" title="类加载器的运作"></a>类加载器的运作</h3><h4 id="双亲委派"><a href="#双亲委派" class="headerlink" title="双亲委派"></a>双亲委派</h4><p>双亲委派是 Java 类加载器运作的重要原理。上面已经提到 Bootstrap ClassLoader 是根加载器，Extension ClassLoader 和 Application ClassLoader 都是 Bootstrap ClassLoader 子类，同时 Application ClassLoader 是 Extension ClassLoader 的子类，三者之间的父子关系为： Bootstrap ClassLoader -&gt; Extension ClassLoader -&gt; Application ClassLoader。</p>
+<p>先以 Application ClassLoader 的运作过程作为例子：当 Application ClassLoader 去加载一个类的时候（由于含有 main() 的类会首先被 Application ClassLoader 初始化，所以很多时候 Java 文件遇到陌生的类时，会先用 Application ClassLoader 去加载，这是类加载器的传递性），会首先将加载类的任务交给 Extension ClassLoader，让 Extension ClassLoader去加载类，这时 Extension ClassLoader 同样的将加载的任务交给它的父亲 Bootstrap ClassLoader，Bootstrap ClassLoader 拿到任务就会去加载这个类，如果没找到这个类的话， Extension ClassLoader 就会自己去执行加载任务，同样的，如果 Extension ClassLoader 没找到这个类的话，Application ClassLoader 就会自己去执行类的加载任务。可以看到，类的加载的过程就像一个递归的过程。</p>
+<p><img src="C:%5Cblog%5Cpublic%5Cimg%5Cp1.png" alt="p1"> </p>
+<h2 id="反射"><a href="#反射" class="headerlink" title="反射"></a>反射</h2><h3 id="类对象的获取"><a href="#类对象的获取" class="headerlink" title="类对象的获取"></a>类对象的获取</h3><ol>
+<li><p>class.forName(“xxx.xxx”)</p>
+<p>通过这种方式，我们可以通过类的全限定名直接获取类的 class 对象，利用起来比较容易</p>
+</li>
+<li><p>className.class </p>
+<p>通过这种方式来获取类对象的话，需要当前文件引用了 className 这个类的库，依赖性较强</p>
+</li>
+<li><p>new className().getClass()</p>
+<p>同样的这种方式只能在引用这个类的前提条件下使用，依赖性也比较强</p>
+<p>以上方法返回值均为类对象</p>
+</li>
+</ol>
+<h3 id="反射的相关方法和使用"><a href="#反射的相关方法和使用" class="headerlink" title="反射的相关方法和使用"></a>反射的相关方法和使用</h3><p>通过反射，我们可以获取到类对象中的属性对象和方法</p>
+<ol>
+<li><p>获取属性对象</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">getField(String name)	&#x2F;&#x2F; 获取类对象的 name 属性（可以是父类的）</span><br><span class="line">getFields()				&#x2F;&#x2F; 获取类对象的所有属性（包括父类的）</span><br><span class="line">getDeclaredField(String name)		&#x2F;&#x2F; 获取当前类的 name 属性（不可以是父类的）</span><br><span class="line">getDeclaredFields()					&#x2F;&#x2F; 获取当前类的所有属性（不包括父类的）</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>获取方法</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">getMethod(String name, parameters)		&#x2F;&#x2F; 获取类对象中的 name 方法（可以是父类的）</span><br><span class="line">getMethods()				&#x2F;&#x2F; 获取类对象的所有方法（包括父类的）</span><br><span class="line">getDeclaredMethod(String name, parameters)		&#x2F;&#x2F; 获取类对象的 name 方法（不可以是父类的）</span><br><span class="line">getDeclaredMethods()				&#x2F;&#x2F; 获取类对象的所有方法（不包括父类的）</span><br></pre></td></tr></table></figure>
+
+<p>需要注意的是使用 getMethod 和 getDeclaredMethod 来获取单个方法时，我们需要在第二个参数传入需要获取的方法的参数的 class 对象，比如：<code>getMethod(add, int.class, int.class)</code> 或是 <code>getMethod(add, new Class[]{int.class, int.class})</code>，到这里，我们还只可以获取方法对象（getMethod 返回值为方法对象），接下来我们可以通过 method 对象的 invoke 方法来执行方法。</p>
+<p>先来看看 invoke 函数的原型：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">invoke(Object obj,Object args[])</span><br><span class="line">两个参数均为对象，第一个参数为目标方法所在的类的对象（常常用newInstance来初始化），第二个参数为对象数组，为当前方法接受到的参数</span><br></pre></td></tr></table></figure>
+
+<p>一个例子：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">method.invoke(className.class.newInstance(), new Object[]&#123;new Interger(11), new Interger(22)&#125;)</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<p>综合以上，得到一个完整的例子：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">class.forName(&quot;xxx.className&quot;).getMethod(&quot;add&quot;, new Class[]&#123;int.class, int.class&#125;).invoke(class.forName(&quot;xxx.className&quot;).newInstance(), new Object[]&#123;new Interger(11), new Interger(22)&#125;)</span><br></pre></td></tr></table></figure>
+
 
       
     </div>
@@ -346,13 +362,13 @@
   
     
     <div class="copyright">
-        <p><span>Title:</span><a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/">Java类加载机制</a></p>
+        <p><span>Title:</span><a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/">ClassLoader与反射</a></p>
         <p><span>Author:</span><a href="/" title="Back to Homepage">yyp0</a></p>
-        <p><span>Created:</span>2020-05-23, 22:40:23</p>
-        <p><span>Updated:</span>2020-05-24, 16:00:27</p>
+        <p><span>Created:</span>2020-05-24, 16:06:03</p>
+        <p><span>Updated:</span>2020-05-24, 23:33:24</p>
         <p>
-            <span>Full URL:</span><a class="post-url" href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/" title="Java类加载机制">http://yoursite.com/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/</a>
-            <span class="copy-path" data-clipboard-text="From http://yoursite.com/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/　　By yyp0" title="Copy Article&#39;s Link &amp; Author"><i class="fa fa-clipboard"></i></span>
+            <span>Full URL:</span><a class="post-url" href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" title="ClassLoader与反射">http://yoursite.com/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/</a>
+            <span class="copy-path" data-clipboard-text="From http://yoursite.com/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/　　By yyp0" title="Copy Article&#39;s Link &amp; Author"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -364,16 +380,10 @@
 
     <nav id="article-nav">
         
-            <div id="article-nav-newer" class="article-nav-title">
-                <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/">
-                    ClassLoader与反射
-                </a>
-            </div>
-        
         
             <div id="article-nav-older" class="article-nav-title">
-                <a href="/2020/05/15/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E5%B0%8F%E6%80%BB%E7%BB%93/">
-                    文件上传小总结
+                <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/">
+                    Java类加载机制
                 </a>
             </div>
         
@@ -385,7 +395,7 @@
     <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#类加载机制"><span class="toc-number">1.</span> <span class="toc-text">类加载机制</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#什么是类加载机制"><span class="toc-number">1.1.</span> <span class="toc-text">什么是类加载机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Java-类加载机制的过程"><span class="toc-number">1.2.</span> <span class="toc-text">Java 类加载机制的过程</span></a></li></ol></li></ol>
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#ClassLoader"><span class="toc-number">1.</span> <span class="toc-text">ClassLoader</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#什么是类加载器"><span class="toc-number">1.1.</span> <span class="toc-text">什么是类加载器</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#类加载器的种类"><span class="toc-number">1.2.</span> <span class="toc-text">类加载器的种类</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#类加载器的运作"><span class="toc-number">1.3.</span> <span class="toc-text">类加载器的运作</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#双亲委派"><span class="toc-number">1.3.1.</span> <span class="toc-text">双亲委派</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#反射"><span class="toc-number">2.</span> <span class="toc-text">反射</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#类对象的获取"><span class="toc-number">2.1.</span> <span class="toc-text">类对象的获取</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#反射的相关方法和使用"><span class="toc-number">2.2.</span> <span class="toc-text">反射的相关方法和使用</span></a></li></ol></li></ol>
         
     </div>
     <style>
@@ -421,7 +431,7 @@
         </div>
         <script>
             window._bd_share_config={
-                "common":{"bdSnsKey":{},"bdText":"Java类加载机制　| yyp0's blog　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+                "common":{"bdSnsKey":{},"bdText":"ClassLoader与反射　| yyp0's blog　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
         </script>
     
 
@@ -441,15 +451,13 @@
 
     <div class="scroll" id="post-nav-button">
         
-            <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" title="Pre: ClassLoader与反射">
-                <i class="fa fa-angle-left"></i>
-            </a>
+            <a href="/" title="Back to Homepage"><i class="fa fa-home"></i></a>
         
 
         <a title="Mini Archives"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
 
         
-            <a href="/2020/05/15/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E5%B0%8F%E6%80%BB%E7%BB%93/" title="Next: 文件上传小总结">
+            <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/" title="Next: Java类加载机制">
                 <i class="fa fa-angle-right"></i>
             </a>
         
