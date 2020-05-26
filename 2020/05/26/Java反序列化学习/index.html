@@ -15,15 +15,15 @@
 
 
 
-<meta name="description" content="Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 Java 类的加载。">
+<meta name="description" content="Java序列化原理Java 的序列化与反序列化分别是由 ObjectOutputStream 类的 writeObject 方法和 ObejctInputStream 的 readObject 方法实现的 最简单的(反)序列化Java 中并不是所有类都可以进行序列化的，如果要对类进行序列化的话，需要让类实现 java.io.serialize 这个接口  序列化 一个简单的例子： 12345678">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Java类加载机制">
-<meta property="og:url" content="http://yoursite.com/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/index.html">
+<meta property="og:title" content="Java反序列化漏洞学习">
+<meta property="og:url" content="http://yoursite.com/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%AD%A6%E4%B9%A0/index.html">
 <meta property="og:site_name" content="yyp0&#39;s blog">
-<meta property="og:description" content="Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 Java 类的加载。">
+<meta property="og:description" content="Java序列化原理Java 的序列化与反序列化分别是由 ObjectOutputStream 类的 writeObject 方法和 ObejctInputStream 的 readObject 方法实现的 最简单的(反)序列化Java 中并不是所有类都可以进行序列化的，如果要对类进行序列化的话，需要让类实现 java.io.serialize 这个接口  序列化 一个简单的例子： 12345678">
 <meta property="og:locale" content="en_US">
-<meta property="article:published_time" content="2020-05-23T14:40:23.000Z">
-<meta property="article:modified_time" content="2020-05-24T08:00:27.359Z">
+<meta property="article:published_time" content="2020-05-26T06:12:22.000Z">
+<meta property="article:modified_time" content="2020-05-26T13:05:25.371Z">
 <meta property="article:author" content="yyp0">
 <meta property="article:tag" content="Java基础">
 <meta name="twitter:card" content="summary">
@@ -60,7 +60,7 @@
 <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
 
 
-<title>Java类加载机制 | yyp0&#39;s blog</title>
+<title>Java反序列化漏洞学习 | yyp0&#39;s blog</title>
 
 <script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
 <script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
@@ -258,11 +258,11 @@
     </div>
     <link class="menu-list" tags="Tags" friends="Friends" about="About Me"/>
 </nav>
-      <div class="body-wrap"><article id="post-Java类加载机制" class="article article-type-post" itemscope itemprop="blogPost">
+      <div class="body-wrap"><article id="post-Java反序列化学习" class="article article-type-post" itemscope itemprop="blogPost">
   
     <div class="article-meta">
-      <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/" class="article-date">
-      <time datetime="2020-05-23T14:40:23.000Z" itemprop="datePublished">2020-05-23</time>
+      <a href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%AD%A6%E4%B9%A0/" class="article-date">
+      <time datetime="2020-05-26T06:12:22.000Z" itemprop="datePublished">2020-05-26</time>
 </a>
 
 
@@ -277,7 +277,7 @@
         
   
     <h1 class="article-title" itemprop="name">
-      Java类加载机制
+      Java反序列化漏洞学习
     </h1>
   
 
@@ -298,44 +298,46 @@
     <div class="article-entry" itemprop="articleBody">
       
           
-        <p>Java从源代码到运行经历了编译和运行的过程，编译就是将源代码编译成字节码的过程，.java 文件被编译成了 .class 文件。运行过程中，.class 文件被 Java 虚拟机解释，经历了类的加载和类的执行两个过程。以下主要阐述 <strong>Java 类的加载</strong>。</p>
-<a id="more"></a>
-
-<h2 id="类加载机制"><a href="#类加载机制" class="headerlink" title="类加载机制"></a>类加载机制</h2><h3 id="什么是类加载机制"><a href="#什么是类加载机制" class="headerlink" title="什么是类加载机制"></a>什么是类加载机制</h3><p>在编译阶段 .java 文件被编译成了 .class 文件，.class 文件中主要是描述类的数据。类的加载就是 Java 虚拟机把描述类的数据从 .class 文件加载到内存，并且队数据进行校验、转换解析和初始化，最终形成可以被虚拟机直接使用的 Java 类型。</p>
-<h3 id="Java-类加载机制的过程"><a href="#Java-类加载机制的过程" class="headerlink" title="Java 类加载机制的过程"></a>Java 类加载机制的过程</h3><p>Java 类加载机制主要分为类的加载、类的连接（验证、准备、解析）、类的初始化三大过程。</p>
+        <h1 id="Java序列化原理"><a href="#Java序列化原理" class="headerlink" title="Java序列化原理"></a>Java序列化原理</h1><p>Java 的序列化与反序列化分别是由 ObjectOutputStream 类的 writeObject 方法和 ObejctInputStream 的 readObject 方法实现的</p>
+<h2 id="最简单的-反-序列化"><a href="#最简单的-反-序列化" class="headerlink" title="最简单的(反)序列化"></a>最简单的(反)序列化</h2><p>Java 中并不是所有类都可以进行序列化的，如果要对类进行序列化的话，需要让类实现 java.io.serialize 这个接口</p>
 <ol>
-<li><p><strong>类的加载</strong></p>
-<p>类的加载主要有三大阶段：<strong>定位 .class 文件</strong>，<strong>转换数据存储结构</strong>，<strong>生成 java.lang.Class 对象</strong></p>
-<p>a. 定位 .class 文件</p>
-<p>通过类的全限定名（包名与类名）来获取相应的 .class 文件，可获取 .class 文件的方式有：本地加载、通过网络下载 .class 文件，从 jar 包或者 war包获取、JSP 文件生成等方式</p>
-<p>b. 转换数据存储结构</p>
-<p>这一步完成的是将 .class 文件中的类的<strong>静态存储结构</strong>转换成<strong>运行时在内存中方法区的数据结构</strong></p>
-<p>c. 生成 java.lang.Class对象</p>
-<p>在内存中生成一个 java.lang.Class 对象，这个对象作为方法区中这个类的数据的入口。</p>
+<li><p>序列化</p>
+<p>一个简单的例子：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; Person.java</span><br><span class="line">public class Person implements serialze&#123;</span><br><span class="line">	private String name;</span><br><span class="line">	</span><br><span class="line">	public Person(String name)&#123;</span><br><span class="line">		this.name &#x3D; name;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	public String toString()&#123;</span><br><span class="line">		return &quot;Person(&quot;+this.name+&quot;)&quot;;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; demo1.java</span><br><span class="line">public class demo1&#123;</span><br><span class="line">	public static void main(String[] args)&#123;</span><br><span class="line">        Person p &#x3D; new Person(&quot;yyp&quot;);</span><br><span class="line">        try&#123;</span><br><span class="line">            FileOutputStream f &#x3D; new FileOutputStream(&quot;1.txt&quot;);</span><br><span class="line">            ObjectOutputStream ser &#x3D; new ObejctOutputStream(f);</span><br><span class="line">            ser.writeObject(p);</span><br><span class="line">            ser.close();</span><br><span class="line">            f.close();</span><br><span class="line">        &#125;catch(IOException i)&#123;</span><br><span class="line">            i.printStackTrace();</span><br><span class="line">        &#125;catch(ClassNotFoundException c)&#123;</span><br><span class="line">            c.printStackTrace();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到在 writeObject() 方法上实现了类的序列化</p>
 </li>
-<li><p><strong>类的初始化</strong></p>
-<p>在类的连接的准备过程中，（仅仅）类的静态常量被初始化赋值（非默认值），在类的初始化阶段，类的静态变量会被初始化赋值（非默认值，在类的连接过程中，静态变量被赋值为默认值）</p>
-<p>以下几种情况需要对类进行初始化：</p>
-<p>​    a. 使用 new 创建对象    </p>
-<p>​    b. 通过反射调用类的方法和对象时，如果类没有被初始化过的话，就必须对类进行初始化</p>
-<p>​    c. 初始化子类时，如果这个类的父类没有被初始化的话那么需要先初始化父类</p>
-<p>​    d. 虚拟机启动时，定义了 main() 方法的类先被初始化</p>
-<p>​    e. 访问类的静态方法和静态变量（非静态常量）</p>
-<p>常见的被动引用例子：</p>
-<p>​    a. 通过子类调用父类的静态变量和方法时，只会对父类进行初始化，子类不会被初始化</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; father.java</span><br><span class="line">public class father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is father!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Fvalue &#x3D; 1;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; son.java</span><br><span class="line">public class son extends father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is son&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Svalue &#x3D; 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; test.java</span><br><span class="line">public class test &#123;</span><br><span class="line">	public static void main(String[] args) &#123;</span><br><span class="line">		System.out.println(son.Fvalue);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; result:</span><br><span class="line">This is father!</span><br><span class="line">1</span><br></pre></td></tr></table></figure>
+<li><p>反序列化</p>
+<p>直接看例子：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; demo2.java</span><br><span class="line">public class demo2&#123;</span><br><span class="line">	public static void main(String[] args)&#123;</span><br><span class="line">		Person p &#x3D; new Person(&quot;yyp&quot;);</span><br><span class="line">		try&#123;</span><br><span class="line">			FIleInputStream f &#x3D; new FileInputStream(&quot;1.txt&quot;);</span><br><span class="line">            ObejctInputStream unser &#x3D; new ObejectInputStream(f);</span><br><span class="line">          	Person pp &#x3D; (Person)unser.readObject();</span><br><span class="line">          	System.out.println(pp);</span><br><span class="line">		&#125;catch(IOException i)&#123;</span><br><span class="line">			i.printStackTrace();</span><br><span class="line">		&#125;catch(ClassNotFoundException c)&#123;</span><br><span class="line">			c.printStackTrace();</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>​    可以看到通过子类访问父类的静态变量时，父类被初始化了，但是子类没有被初始化</p>
-<p>​    b. 使用 new 创建类数组</p>
-<p>​        稍微修改以上代码：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; test.java</span><br><span class="line">public class test &#123;</span><br><span class="line">	public static void main(string[] args) &#123;</span><br><span class="line">		father[] farr &#x3D; new father[5];</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 readObject 处实现了反序列化</p>
+</li>
+</ol>
+<h2 id="自定义-反-序列化"><a href="#自定义-反-序列化" class="headerlink" title="自定义(反)序列化"></a>自定义(反)序列化</h2><ol>
+<li><p>transient</p>
+<p>序列化时会自动忽略带有 transient 属性</p>
+<p>对于上面的 Person 类，如果给 name 加上 transient 关键字 <code>private transient String name;</code> ，反序列化输出得到的结果为 <code>Person(null)</code>，而没有加这个关键字时，得到的鸡国为 <code>Person(yyp)</code>。可以看到对于带有 transient 字段的属性会在序列化的时候赋予默认值。</p>
+</li>
+<li><p>writeReplace 和 readResolve 方法</p>
+<p>writeReplace 和 readResolve 类似于 php 的 __sleep__ 和 __wakeup__ 方法，这两个方法使用时在需要被序列化的类中进行定义，如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">public Object writeReplace() throws ObjectStreamException &#123;</span><br><span class="line">	ArrayList arr &#x3D; new ArrayList&lt;&gt;2;</span><br><span class="line">	arr.add(this.name);</span><br><span class="line">	return arr;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>​        从运行的结果可以看出来此时没有进行类的初始化</p>
-<p>​    c. 访问类的常量时，不会初始化类（常量在类的连接的准备过程中就被初始化了）</p>
-<p>​        给 father 类添加一个静态常量：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; father.java</span><br><span class="line">public class father &#123;</span><br><span class="line">	static &#123;</span><br><span class="line">		System.out.println(&quot;This is father!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	public static int Fvalue &#x3D; 1;</span><br><span class="line">	public static final int FSvalue &#x3D; 11;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>加上这个函数时，我们得到的反序列化结果为: [yyp]，可以看到，writeObject 序列化时的对象为 writeReplace 函数返回的值</p>
+<p>再来看一下 readResolve 方法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">public Object readResolve() throws ObjectStreamException &#123;</span><br><span class="line">	Person p &#x3D; new Person(&quot;asdasd&quot;);</span><br><span class="line">	return p;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>​    得到的结果直接输出了 11，可以看到静态常量在类初始化之前就已经被赋值了</p>
+<p>重新序列化，查看反序列化结果，得到 <code>Person(asdasd)</code></p>
+<p>综上，可以得到函数之间调用的顺序：writeReplace -&gt; writeObject，readObject -&gt; readResolve</p>
+</li>
+<li><p>Externalizable 自定义序列化</p>
+<p>需要在类中实现 writeExternal 和 readExternal 方法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">public class Person implements Externalizable &#123;</span><br><span class="line">	private String name;</span><br><span class="line">	private int age;</span><br><span class="line">	</span><br><span class="line">	public void writeExternal(ObjectOutput out) throws IOException&#123;	</span><br><span class="line">		&#x2F;&#x2F; 可以对属性进行其他的操作</span><br><span class="line">		out.writeObject(name);</span><br><span class="line">		out.writeInt(age);</span><br><span class="line">	&#125;</span><br><span class="line">	public void readExternam(ObejctInput in) throws IOExeption,classNotFoundException&#123;</span><br><span class="line">		name &#x3D; (String) in.readObject();</span><br><span class="line">		age &#x3D; in.readInt();</span><br><span class="line">		&#x2F;&#x2F; ...</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>resolveClass 方法</p>
+<p>resolveClass 方法是 ObjectInputStream 类中的一个方法，在 ObjectInputStream 中的 resolveClass 方法默认做的工作是检查这个类可否被 load（类的加载），但是可以通过重载 resolveClass，使其具有白名单功能。</p>
 </li>
 </ol>
 
@@ -346,13 +348,13 @@
   
     
     <div class="copyright">
-        <p><span>Title:</span><a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/">Java类加载机制</a></p>
+        <p><span>Title:</span><a href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%AD%A6%E4%B9%A0/">Java反序列化漏洞学习</a></p>
         <p><span>Author:</span><a href="/" title="Back to Homepage">yyp0</a></p>
-        <p><span>Created:</span>2020-05-23, 22:40:23</p>
-        <p><span>Updated:</span>2020-05-24, 16:00:27</p>
+        <p><span>Created:</span>2020-05-26, 14:12:22</p>
+        <p><span>Updated:</span>2020-05-26, 21:05:25</p>
         <p>
-            <span>Full URL:</span><a class="post-url" href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/" title="Java类加载机制">http://yoursite.com/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/</a>
-            <span class="copy-path" data-clipboard-text="From http://yoursite.com/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/　　By yyp0" title="Copy Article&#39;s Link &amp; Author"><i class="fa fa-clipboard"></i></span>
+            <span>Full URL:</span><a class="post-url" href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%AD%A6%E4%B9%A0/" title="Java反序列化漏洞学习">http://yoursite.com/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%AD%A6%E4%B9%A0/</a>
+            <span class="copy-path" data-clipboard-text="From http://yoursite.com/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%AD%A6%E4%B9%A0/　　By yyp0" title="Copy Article&#39;s Link &amp; Author"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -364,16 +366,10 @@
 
     <nav id="article-nav">
         
-            <div id="article-nav-newer" class="article-nav-title">
-                <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/">
-                    ClassLoader与反射
-                </a>
-            </div>
-        
         
             <div id="article-nav-older" class="article-nav-title">
-                <a href="/2020/05/15/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E5%B0%8F%E6%80%BB%E7%BB%93/">
-                    文件上传小总结
+                <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/">
+                    ClassLoader与反射
                 </a>
             </div>
         
@@ -385,7 +381,7 @@
     <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#类加载机制"><span class="toc-number">1.</span> <span class="toc-text">类加载机制</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#什么是类加载机制"><span class="toc-number">1.1.</span> <span class="toc-text">什么是类加载机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Java-类加载机制的过程"><span class="toc-number">1.2.</span> <span class="toc-text">Java 类加载机制的过程</span></a></li></ol></li></ol>
+            <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Java序列化原理"><span class="toc-number">1.</span> <span class="toc-text">Java序列化原理</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#最简单的-反-序列化"><span class="toc-number">1.1.</span> <span class="toc-text">最简单的(反)序列化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#自定义-反-序列化"><span class="toc-number">1.2.</span> <span class="toc-text">自定义(反)序列化</span></a></li></ol></li></ol>
         
     </div>
     <style>
@@ -421,7 +417,7 @@
         </div>
         <script>
             window._bd_share_config={
-                "common":{"bdSnsKey":{},"bdText":"Java类加载机制　| yyp0's blog　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+                "common":{"bdSnsKey":{},"bdText":"Java反序列化漏洞学习　| yyp0's blog　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
         </script>
     
 
@@ -441,15 +437,13 @@
 
     <div class="scroll" id="post-nav-button">
         
-            <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" title="Pre: ClassLoader与反射">
-                <i class="fa fa-angle-left"></i>
-            </a>
+            <a href="/" title="Back to Homepage"><i class="fa fa-home"></i></a>
         
 
         <a title="Mini Archives"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
 
         
-            <a href="/2020/05/15/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E5%B0%8F%E6%80%BB%E7%BB%93/" title="Next: 文件上传小总结">
+            <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" title="Next: ClassLoader与反射">
                 <i class="fa fa-angle-right"></i>
             </a>
         
