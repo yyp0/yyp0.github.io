@@ -15,20 +15,18 @@
 
 
 
-<meta name="description" content="ClassLoader什么是类加载器类加载器完成的是类加载机制中的类的加载的部分，完成从静态的 .class 文件生成 java.lang.class 对象（可以参照上一篇对 Java 类加载机制的学习">
+<meta name="description" content="Apache Common CollectionsApache Common Collections 反序列化造成的 rce 出现在  InvokerTransformer 这个类里，漏洞点是通过 Java 反射机制调用方法： 在 InvokerTransformer.class 中: 12345678910111213141516public Object transform(Object in">
 <meta property="og:type" content="article">
-<meta property="og:title" content="ClassLoader与反射">
-<meta property="og:url" content="http://yoursite.com/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/index.html">
+<meta property="og:title" content="一些Java反序列化漏洞的复现">
+<meta property="og:url" content="http://yoursite.com/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/index.html">
 <meta property="og:site_name" content="yyp0&#39;s blog">
-<meta property="og:description" content="ClassLoader什么是类加载器类加载器完成的是类加载机制中的类的加载的部分，完成从静态的 .class 文件生成 java.lang.class 对象（可以参照上一篇对 Java 类加载机制的学习">
+<meta property="og:description" content="Apache Common CollectionsApache Common Collections 反序列化造成的 rce 出现在  InvokerTransformer 这个类里，漏洞点是通过 Java 反射机制调用方法： 在 InvokerTransformer.class 中: 12345678910111213141516public Object transform(Object in">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="c:%5Cblog%5Cpublic%5Cimg%5Cp1.png">
-<meta property="article:published_time" content="2020-05-24T08:06:03.000Z">
-<meta property="article:modified_time" content="2020-05-24T15:35:13.281Z">
+<meta property="article:published_time" content="2020-05-28T07:31:54.000Z">
+<meta property="article:modified_time" content="2020-05-28T13:21:46.899Z">
 <meta property="article:author" content="yyp0">
-<meta property="article:tag" content="Java基础">
+<meta property="article:tag" content="漏洞复现 反序列化">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="c:%5Cblog%5Cpublic%5Cimg%5Cp1.png">
 
 <link rel="apple-touch-icon" href= "/apple-touch-icon.png">
 
@@ -62,7 +60,7 @@
 <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
 
 
-<title>ClassLoader与反射 | yyp0&#39;s blog</title>
+<title>一些Java反序列化漏洞的复现 | yyp0&#39;s blog</title>
 
 <script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
 <script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
@@ -262,11 +260,11 @@
     </div>
     <link class="menu-list" tags="Tags" friends="Friends" about="About Me"/>
 </nav>
-      <div class="body-wrap"><article id="post-ClassLoader与反射" class="article article-type-post" itemscope itemprop="blogPost">
+      <div class="body-wrap"><article id="post-一些Java反序列化漏洞的复现" class="article article-type-post" itemscope itemprop="blogPost">
   
     <div class="article-meta">
-      <a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" class="article-date">
-      <time datetime="2020-05-24T08:06:03.000Z" itemprop="datePublished">2020-05-24</time>
+      <a href="/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/" class="article-date">
+      <time datetime="2020-05-28T07:31:54.000Z" itemprop="datePublished">2020-05-28</time>
 </a>
 
 
@@ -281,7 +279,7 @@
         
   
     <h1 class="article-title" itemprop="name">
-      ClassLoader与反射
+      一些Java反序列化漏洞的复现
     </h1>
   
 
@@ -292,7 +290,7 @@
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Java%E5%9F%BA%E7%A1%80/" rel="tag">Java基础</a></li></ul>
+        <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0-%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/" rel="tag">漏洞复现 反序列化</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -302,62 +300,25 @@
     <div class="article-entry" itemprop="articleBody">
       
           
-        <h2 id="ClassLoader"><a href="#ClassLoader" class="headerlink" title="ClassLoader"></a>ClassLoader</h2><h3 id="什么是类加载器"><a href="#什么是类加载器" class="headerlink" title="什么是类加载器"></a>什么是类加载器</h3><p>类加载器完成的是类加载机制中的类的加载的部分，完成从静态的 .class 文件生成 java.lang.class 对象（可以参照上一篇对 Java 类加载机制的学习</p>
-<a id="more"></a>
+        <h1 id="Apache-Common-Collections"><a href="#Apache-Common-Collections" class="headerlink" title="Apache Common Collections"></a>Apache Common Collections</h1><p>Apache Common Collections 反序列化造成的 rce 出现在  InvokerTransformer 这个类里，漏洞点是通过 Java 反射机制调用方法：</p>
+<p>在 InvokerTransformer.class 中:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">public Object transform(Object input) &#123;</span><br><span class="line">  if (input &#x3D;&#x3D; null) &#123;</span><br><span class="line">      return null;</span><br><span class="line">  &#125;</span><br><span class="line">  try &#123;</span><br><span class="line">        Class cls &#x3D; input.getClass();</span><br><span class="line">        Method method &#x3D; cls.getMethod(iMethodName, iParamTypes); </span><br><span class="line">        return method.invoke(input, iArgs);        </span><br><span class="line">  &#125; catch (NoSuchMethodException ex) &#123;</span><br><span class="line">        throw new FunctorException(&quot;InvokerTransformer: The method &#39;&quot; + iMethodName + &quot;&#39; on &#39;&quot; + input.getClass() + &quot;&#39; does not exist&quot;);</span><br><span class="line">  &#125; catch (IllegalAccessException ex) &#123;</span><br><span class="line">        throw new FunctorException(&quot;InvokerTransformer: The method &#39;&quot; + iMethodName + &quot;&#39; on &#39;&quot; + input.getClass() + &quot;&#39; cannot be accessed&quot;);</span><br><span class="line">  &#125; catch (InvocationTargetException ex) &#123;</span><br><span class="line">        throw new FunctorException(&quot;InvokerTransformer: The method &#39;&quot; + iMethodName + &quot;&#39; on &#39;&quot; + input.getClass() + &quot;&#39; threw an exception&quot;, ex);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<h3 id="类加载器的种类"><a href="#类加载器的种类" class="headerlink" title="类加载器的种类"></a>类加载器的种类</h3><p>在 Java 中内置的 ClassLoader 有三种：Bootstrap ClassLoader, Extension ClassLoader, Application ClassLoader，另外还可以通过自定义 ClassLoader 来决定类的加载方式</p>
-<ol>
-<li><p>Bootstrap ClassLoader</p>
-<p>这是 Java 最基础的类加载器，负责加载 JVM 核心类，通常是我们常常看到的 java. 开头的内置库。这些类通常位于 $JAVA_HOME/lib/rt.jar 中， Bootstrap ClassLoader 为根加载器</p>
-</li>
-<li><p>Extension ClassLoader</p>
-<p>Extension ClassLoader 加载的对象是 $JAVA_HOME/lib/ext/ 目录下的 jar 包中的类，加载得到的类通常是我们看到的 javax. 开头的扩展类，如 javax.swing.* 等，Extension ClassLoader 继承 Bootstrap ClassLoader，是 Bootstrap ClassLoader 的子类 </p>
-</li>
-<li><p>Application ClassLoader</p>
-<p>Application ClassLoader  是直接面向用户的加载器，Application ClassLoader 加载的对象是环境变量里面的路径的 jar 包或者路径中的 jar 包，还有我们自己编写的 java 文件以及第三方 jar 包。Application ClassLoader 继承 Extension ClassLoader，是Extension ClassLoader 的子类 。Application ClassLoader 也被成为系统加载器，可以通过 getSystemClassLoader 获取。</p>
-</li>
-</ol>
-<p>以上三个加载器都是在本地文件系统加载类，在 Java 中还有一种类加载器 Url ClassLoader，使用Url ClassLoader 可以加载网络上的 jar 包中的类。</p>
-<ol start="4">
-<li><p>自定义加载器</p>
-<p>定义一个加载器时，需要注意定义这几个方法：loadClass, findClass, defineClass。其中 loadClass 的作用是在当前类加载器中寻找这个类看这个类是否已被加载，如果未被加载的话，就调用父加载器进行加载，如果双亲都加载不了的话，就调用 findClass 由自定义加载器自己进行加载。这里需要注意 findClass 常常由自定义类加载器的子类自己定义。如果调用了 findClass 还是加载不了这个类的话，就会抛出异常。defineClass 的作用就是当类加载器完成 loadClass 和 findClass 的步骤时，将字节码对象转换成 class 对象，完成类的加载过程。 </p>
-</li>
-</ol>
-<h3 id="类加载器的运作"><a href="#类加载器的运作" class="headerlink" title="类加载器的运作"></a>类加载器的运作</h3><h4 id="双亲委派"><a href="#双亲委派" class="headerlink" title="双亲委派"></a>双亲委派</h4><p>双亲委派是 Java 类加载器运作的重要原理。上面已经提到 Bootstrap ClassLoader 是根加载器，Extension ClassLoader 和 Application ClassLoader 都是 Bootstrap ClassLoader 子类，同时 Application ClassLoader 是 Extension ClassLoader 的子类，三者之间的父子关系为： Bootstrap ClassLoader -&gt; Extension ClassLoader -&gt; Application ClassLoader。</p>
-<p>先以 Application ClassLoader 的运作过程作为例子：当 Application ClassLoader 去加载一个类的时候（由于含有 main() 的类会首先被 Application ClassLoader 初始化，所以很多时候 Java 文件遇到陌生的类时，会先用 Application ClassLoader 去加载，这是类加载器的传递性），会首先将加载类的任务交给 Extension ClassLoader，让 Extension ClassLoader去加载类，这时 Extension ClassLoader 同样的将加载的任务交给它的父亲 Bootstrap ClassLoader，Bootstrap ClassLoader 拿到任务就会去加载这个类，如果没找到这个类的话， Extension ClassLoader 就会自己去执行加载任务，同样的，如果 Extension ClassLoader 没找到这个类的话，Application ClassLoader 就会自己去执行类的加载任务。可以看到，类的加载的过程就像一个递归的过程。</p>
-<p><img src="C:%5Cblog%5Cpublic%5Cimg%5Cp1.png" alt="p1"> </p>
-<h2 id="反射"><a href="#反射" class="headerlink" title="反射"></a>反射</h2><h3 id="类对象的获取"><a href="#类对象的获取" class="headerlink" title="类对象的获取"></a>类对象的获取</h3><ol>
-<li><p>class.forName(“xxx.xxx”)</p>
-<p>通过这种方式，我们可以通过类的全限定名直接获取类的 class 对象，利用起来比较容易</p>
-</li>
-<li><p>className.class </p>
-<p>通过这种方式来获取类对象的话，需要当前文件引用了 className 这个类的库，依赖性较强</p>
-</li>
-<li><p>new className().getClass()</p>
-<p>同样的这种方式只能在引用这个类的前提条件下使用，依赖性也比较强</p>
-<p>以上方法返回值均为类对象</p>
-</li>
-</ol>
-<h3 id="反射的相关方法和使用"><a href="#反射的相关方法和使用" class="headerlink" title="反射的相关方法和使用"></a>反射的相关方法和使用</h3><p>通过反射，我们可以获取到类对象中的属性对象和方法</p>
-<ol>
-<li><p>获取属性对象</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">getField(String name)	&#x2F;&#x2F; 获取类对象的 name 属性（可以是父类的）</span><br><span class="line">getFields()				&#x2F;&#x2F; 获取类对象的所有属性（包括父类的）</span><br><span class="line">getDeclaredField(String name)		&#x2F;&#x2F; 获取当前类的 name 属性（不可以是父类的）</span><br><span class="line">getDeclaredFields()					&#x2F;&#x2F; 获取当前类的所有属性（不包括父类的）</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>获取方法</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">getMethod(String name, parameters)		&#x2F;&#x2F; 获取类对象中的 name 方法（可以是父类的）</span><br><span class="line">getMethods()				&#x2F;&#x2F; 获取类对象的所有方法（包括父类的）</span><br><span class="line">getDeclaredMethod(String name, parameters)		&#x2F;&#x2F; 获取类对象的 name 方法（不可以是父类的）</span><br><span class="line">getDeclaredMethods()				&#x2F;&#x2F; 获取类对象的所有方法（不包括父类的）</span><br></pre></td></tr></table></figure>
+<p>可以看到，在漏洞函数内存在反射调用，回溯 iMethodName 和 iParamType 以及 iArgs，可以看到 InvokerTransformer 类的构造函数：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">public InvokerTransformer(String methodName, Class[] paramTypes, Object[] args) &#123;</span><br><span class="line">        super();</span><br><span class="line">        iMethodName &#x3D; methodName;</span><br><span class="line">        iParamTypes &#x3D; paramTypes;</span><br><span class="line">        iArgs &#x3D; args;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
 
-<p>需要注意的是使用 getMethod 和 getDeclaredMethod 来获取单个方法时，我们需要在第二个参数传入需要获取的方法的参数的 class 对象，比如：<code>getMethod(add, int.class, int.class)</code> 或是 <code>getMethod(add, new Class[]{int.class, int.class})</code>，到这里，我们还只可以获取方法对象（getMethod 返回值为方法对象），接下来我们可以通过 method 对象的 invoke 方法来执行方法。</p>
-<p>先来看看 invoke 函数的原型：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">invoke(Object obj,Object args[])</span><br><span class="line">两个参数均为对象，第一个参数为目标方法所在的类的对象（常常用newInstance来初始化），第二个参数为对象数组，为当前方法接受到的参数</span><br></pre></td></tr></table></figure>
+<p>变量可控。</p>
+<p>接着看 TransformedMap.class，在 TransformedMap 类的 checkSetValue 方法中，可以看到：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">protected Object checkSetValue(Object value) &#123;</span><br><span class="line">       return valueTransformer.transform(value);        </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>一个例子：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">method.invoke(className.class.newInstance(), new Object[]&#123;new Interger(11), new Interger(22)&#125;)</span><br></pre></td></tr></table></figure>
+<p>这里存在一个 transform 的方法调用，回溯一下 valueTransformer，构造函数： </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">public static Map decorate(Map map, Transformer keyTransformer, Transformer valueTransformer) &#123;  &#x2F;&#x2F; 对外创建类对象</span><br><span class="line">        return new TransformedMap(map, keyTransformer, valueTransformer);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">protected TransformedMap(Map map, Transformer keyTransformer, Transformer valueTransformer) &#123;</span><br><span class="line">        super(map);</span><br><span class="line">        this.keyTransformer &#x3D; keyTransformer;</span><br><span class="line">        this.valueTransformer &#x3D; valueTransformer;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-</li>
-</ol>
-<p>综合以上，得到一个完整的例子：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">class.forName(&quot;xxx.className&quot;).getMethod(&quot;add&quot;, new Class[]&#123;int.class, int.class&#125;).invoke(class.forName(&quot;xxx.className&quot;).newInstance(), new Object[]&#123;new Interger(11), new Interger(22)&#125;)</span><br></pre></td></tr></table></figure>
+<p>valueTransformer 类型为 Transformer 且可控。</p>
+<p>另外，在 AbstractInputCheckedMapDecorator.class 中，重载了 Map 的内部借口 Map.Entry 的 setValue 方法，并且调用了 checkSetValue 方法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">public Object setValue(Object value) &#123;</span><br><span class="line"> 	value &#x3D; parent.checkSetValue(value);          </span><br><span class="line">    return entry.setValue(value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
+<p>也就是说，如果再某个类中自定义了反序列化方法，并且对 map 对象操作了键值，那么就可以触发以上反序列化链。</p>
 
       
     </div>
@@ -366,13 +327,13 @@
   
     
     <div class="copyright">
-        <p><span>Title:</span><a href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/">ClassLoader与反射</a></p>
+        <p><span>Title:</span><a href="/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/">一些Java反序列化漏洞的复现</a></p>
         <p><span>Author:</span><a href="/" title="Back to Homepage">yyp0</a></p>
-        <p><span>Created:</span>2020-05-24, 16:06:03</p>
-        <p><span>Updated:</span>2020-05-24, 23:35:13</p>
+        <p><span>Created:</span>2020-05-28, 15:31:54</p>
+        <p><span>Updated:</span>2020-05-28, 21:21:46</p>
         <p>
-            <span>Full URL:</span><a class="post-url" href="/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/" title="ClassLoader与反射">http://yoursite.com/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/</a>
-            <span class="copy-path" data-clipboard-text="From http://yoursite.com/2020/05/24/ClassLoader%E4%B8%8E%E5%8F%8D%E5%B0%84/　　By yyp0" title="Copy Article&#39;s Link &amp; Author"><i class="fa fa-clipboard"></i></span>
+            <span>Full URL:</span><a class="post-url" href="/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/" title="一些Java反序列化漏洞的复现">http://yoursite.com/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/</a>
+            <span class="copy-path" data-clipboard-text="From http://yoursite.com/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/　　By yyp0" title="Copy Article&#39;s Link &amp; Author"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -384,16 +345,10 @@
 
     <nav id="article-nav">
         
-            <div id="article-nav-newer" class="article-nav-title">
-                <a href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/">
-                    Java反序列化
-                </a>
-            </div>
-        
         
             <div id="article-nav-older" class="article-nav-title">
-                <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/">
-                    Java类加载机制
+                <a href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/">
+                    Java反序列化
                 </a>
             </div>
         
@@ -405,7 +360,7 @@
     <div id="toc" class="toc-article">
         <strong class="toc-title">Contents</strong>
         
-            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#ClassLoader"><span class="toc-number">1.</span> <span class="toc-text">ClassLoader</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#什么是类加载器"><span class="toc-number">1.1.</span> <span class="toc-text">什么是类加载器</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#类加载器的种类"><span class="toc-number">1.2.</span> <span class="toc-text">类加载器的种类</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#类加载器的运作"><span class="toc-number">1.3.</span> <span class="toc-text">类加载器的运作</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#双亲委派"><span class="toc-number">1.3.1.</span> <span class="toc-text">双亲委派</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#反射"><span class="toc-number">2.</span> <span class="toc-text">反射</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#类对象的获取"><span class="toc-number">2.1.</span> <span class="toc-text">类对象的获取</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#反射的相关方法和使用"><span class="toc-number">2.2.</span> <span class="toc-text">反射的相关方法和使用</span></a></li></ol></li></ol>
+            <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Apache-Common-Collections"><span class="toc-number">1.</span> <span class="toc-text">Apache Common Collections</span></a></li></ol>
         
     </div>
     <style>
@@ -441,7 +396,7 @@
         </div>
         <script>
             window._bd_share_config={
-                "common":{"bdSnsKey":{},"bdText":"ClassLoader与反射　| yyp0's blog　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+                "common":{"bdSnsKey":{},"bdText":"一些Java反序列化漏洞的复现　| yyp0's blog　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
         </script>
     
 
@@ -461,15 +416,13 @@
 
     <div class="scroll" id="post-nav-button">
         
-            <a href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/" title="Pre: Java反序列化">
-                <i class="fa fa-angle-left"></i>
-            </a>
+            <a href="/" title="Back to Homepage"><i class="fa fa-home"></i></a>
         
 
         <a title="Mini Archives"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
 
         
-            <a href="/2020/05/23/Java%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6/" title="Next: Java类加载机制">
+            <a href="/2020/05/26/Java%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/" title="Next: Java反序列化">
                 <i class="fa fa-angle-right"></i>
             </a>
         

@@ -189,7 +189,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java%E5%9F%BA%E7%A1%80/" rel="tag">Java基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/" rel="tag">文件上传</a></li></ul>
+                        <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Java%E5%9F%BA%E7%A1%80/" rel="tag">Java基础</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/" rel="tag">文件上传</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0-%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/" rel="tag">漏洞复现 反序列化</a></li></ul>
                     </div>
                 </section>
                 
@@ -263,6 +263,84 @@
     <link class="menu-list" tags="Tags" friends="Friends" about="About Me"/>
 </nav>
       <div class="body-wrap">
+  
+    <article id="post-一些Java反序列化漏洞的复现" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/" class="article-date">
+      <time datetime="2020-05-28T07:31:54.000Z" itemprop="datePublished">2020-05-28</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/05/28/%E4%B8%80%E4%BA%9BJava%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%A4%8D%E7%8E%B0/">一些Java反序列化漏洞的复现</a>
+    </h1>
+  
+
+      </header>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <h1 id="Apache-Common-Collections"><a href="#Apache-Common-Collections" class="headerlink" title="Apache Common Collections"></a>Apache Common Collections</h1><p>Apache Common Collections 反序列化造成的 rce 出现在  InvokerTransformer 这个类里，漏洞点是通过 Java 反射机制调用方法：</p>
+<p>在 InvokerTransformer.class 中:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">public Object transform(Object input) &#123;</span><br><span class="line">  if (input &#x3D;&#x3D; null) &#123;</span><br><span class="line">      return null;</span><br><span class="line">  &#125;</span><br><span class="line">  try &#123;</span><br><span class="line">        Class cls &#x3D; input.getClass();</span><br><span class="line">        Method method &#x3D; cls.getMethod(iMethodName, iParamTypes); </span><br><span class="line">        return method.invoke(input, iArgs);        </span><br><span class="line">  &#125; catch (NoSuchMethodException ex) &#123;</span><br><span class="line">        throw new FunctorException(&quot;InvokerTransformer: The method &#39;&quot; + iMethodName + &quot;&#39; on &#39;&quot; + input.getClass() + &quot;&#39; does not exist&quot;);</span><br><span class="line">  &#125; catch (IllegalAccessException ex) &#123;</span><br><span class="line">        throw new FunctorException(&quot;InvokerTransformer: The method &#39;&quot; + iMethodName + &quot;&#39; on &#39;&quot; + input.getClass() + &quot;&#39; cannot be accessed&quot;);</span><br><span class="line">  &#125; catch (InvocationTargetException ex) &#123;</span><br><span class="line">        throw new FunctorException(&quot;InvokerTransformer: The method &#39;&quot; + iMethodName + &quot;&#39; on &#39;&quot; + input.getClass() + &quot;&#39; threw an exception&quot;, ex);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，在漏洞函数内存在反射调用，回溯 iMethodName 和 iParamType 以及 iArgs，可以看到 InvokerTransformer 类的构造函数：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">public InvokerTransformer(String methodName, Class[] paramTypes, Object[] args) &#123;</span><br><span class="line">        super();</span><br><span class="line">        iMethodName &#x3D; methodName;</span><br><span class="line">        iParamTypes &#x3D; paramTypes;</span><br><span class="line">        iArgs &#x3D; args;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<p>变量可控。</p>
+<p>接着看 TransformedMap.class，在 TransformedMap 类的 checkSetValue 方法中，可以看到：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">protected Object checkSetValue(Object value) &#123;</span><br><span class="line">       return valueTransformer.transform(value);        </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里存在一个 transform 的方法调用，回溯一下 valueTransformer，构造函数： </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">public static Map decorate(Map map, Transformer keyTransformer, Transformer valueTransformer) &#123;  &#x2F;&#x2F; 对外创建类对象</span><br><span class="line">        return new TransformedMap(map, keyTransformer, valueTransformer);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">protected TransformedMap(Map map, Transformer keyTransformer, Transformer valueTransformer) &#123;</span><br><span class="line">        super(map);</span><br><span class="line">        this.keyTransformer &#x3D; keyTransformer;</span><br><span class="line">        this.valueTransformer &#x3D; valueTransformer;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>valueTransformer 类型为 Transformer 且可控。</p>
+<p>另外，在 AbstractInputCheckedMapDecorator.class 中，重载了 Map 的内部借口 Map.Entry 的 setValue 方法，并且调用了 checkSetValue 方法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">public Object setValue(Object value) &#123;</span><br><span class="line"> 	value &#x3D; parent.checkSetValue(value);          </span><br><span class="line">    return entry.setValue(value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，如果再某个类中自定义了反序列化方法，并且对 map 对象操作了键值，那么就可以触发以上反序列化链。</p>
+
+      
+    </div>
+    
+    <div class="article-info article-info-index">
+      
+      
+
+      
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0-%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/" rel="tag">漏洞复现 反序列化</a></li></ul>
+    </div>
+
+      
+      <div class="clearfix"></div>
+    </div>
+    
+  </div>
+  
+</article>
+
+
+
+
+
+
+
+
+
   
     <article id="post-Java反序列化" class="article article-type-post" itemscope itemprop="blogPost">
   
